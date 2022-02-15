@@ -29,6 +29,7 @@ function Namespace(name) {
   this.id = null;
   this._contexts = new Map();
   this._indent = 0;
+  this._hook = null;
 }
 
 Namespace.prototype.set = function set(key, value) {
@@ -49,7 +50,7 @@ Namespace.prototype.set = function set(key, value) {
 Namespace.prototype.get = function get(key) {
   if (!this.active) {
     if (DEBUG_CLS_HOOKED) {
-      const asyncHooksCurrentId = async_hooks.currentId();
+      const asyncHooksCurrentId = async_hooks.executionAsyncId();
       const triggerId = async_hooks.triggerAsyncId();
       const indentStr = ' '.repeat(this._indent < 0 ? 0 : this._indent);
       //debug2(indentStr + 'CONTEXT-GETTING KEY NO ACTIVE NS:' + key + '=undefined' + ' (' + this.name + ') currentUid:' + currentUid + ' active:' + util.inspect(this.active, {showHidden:true, depth:2, colors:true}));
@@ -69,7 +70,8 @@ Namespace.prototype.get = function get(key) {
 
 Namespace.prototype.createContext = function createContext() {
   // Prototype inherit existing context if created a new child context within existing context.
-  let context = Object.create(this.active ? this.active : Object.prototype);
+  // const context = this.active ? Object.assign({}, this.active) : {};
+  const context = Object.assign({});
   context._ns_name = this.name;
   context.id = currentUid;
 
@@ -427,6 +429,8 @@ function createNamespace(name) {
 
   hook.enable();
 
+  namespace._hook = hook;
+
   process.namespaces[name] = namespace;
   return namespace;
 }
@@ -437,7 +441,16 @@ function destroyNamespace(name) {
   assert.ok(namespace, 'can\'t delete nonexistent namespace! "' + name + '"');
   assert.ok(namespace.id, 'don\'t assign to process.namespaces directly! ' + util.inspect(namespace));
 
-  process.namespaces[name] = null;
+  namespace._hook.disable();
+
+  /*
+  * Zeroing _contexts as heaviest part of Namespace
+  * In case our namespace is retained mistakenly, so
+  * at least we are releasing heaviest part
+  */
+  namespace._contexts = null;
+
+  delete process.namespaces[name];
 }
 
 function reset() {

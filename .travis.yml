@@ -4,11 +4,11 @@ script:
 language: node_js
 
 node_js:
-  - "6"
   - "8"
   - "10"
   - "12"
-  - "13"
+  - "14"
+  - "16"
 
 sudo: false
 dist: trusty
